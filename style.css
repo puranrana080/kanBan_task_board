@@ -1,0 +1,10 @@
+*{
+    padding:0px;
+    margin:0px;
+    font-family: sans-serif
+}
+
+
+ #todo, #inprogress, #done {
+  min-height:150px
+}  
