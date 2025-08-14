@@ -1,81 +1,93 @@
+
 // Form Submit
-document
-  .getElementById("todo-form")
-  .addEventListener("submit", function (event) {
-    event.preventDefault();
-    const enteredTodo = document.getElementById("enteredTodo").value.trim();
-    console.log("new ToDo", enteredTodo);
+document.getElementById("todo-form").addEventListener("submit", function (event) {
+  event.preventDefault();
+  const enteredTodo = document.getElementById("enteredTodo").value.trim();
 
-    //inset into localStorage
-    let localStorageToDo = JSON.parse(localStorage.getItem("todos"));
+  if (!enteredTodo) return;
 
-    let todoExist = localStorageToDo.find((todo) => todo.todo == enteredTodo);
-    if (todoExist) {
-      alert("ToDo already added");
-      location.reload()
-      return;
-    }
+  let localStorageToDo = JSON.parse(localStorage.getItem("todos")) || [];
 
-    localStorageToDo.push({
-      id: localStorageToDo.length,
-      todo: enteredTodo,
-      status: "todo",
-    });
-    localStorage.setItem("todos", JSON.stringify(localStorageToDo));
-    location.reload();
-  });
-
-document.addEventListener("DOMContentLoaded", function () {
-  if (!localStorage.getItem("todos")) {
-    localStorage.setItem("todos", JSON.stringify([]));
+  const todoExist = localStorageToDo.find((todo) => todo.todo === enteredTodo);
+  if (todoExist) {
+    alert("ToDo already added");
+    document.getElementById("todo-form").reset();
+    return;
   }
-  let todoTaskData = JSON.parse(localStorage.getItem("todos"));
-  console.log("All Data", todoTaskData);
 
-  // new todo task Added
-  const newTaskData = todoTaskData.filter((item) => item.status === "todo");
-  newTaskData.forEach((item) => {
-    insertIntoColumn(item, "todo", "light");
+  localStorageToDo.push({
+    id: Date.now(), // Better unique ID than array index
+    todo: enteredTodo,
+    status: "todo",
   });
 
-  // In progress Data
-  const inProgressTaskData = todoTaskData.filter(
-    (item) => item.status === "inprogress"
-  );
-  inProgressTaskData.forEach((item) => {
-    insertIntoColumn(item, "inprogress", "info");
+  localStorage.setItem("todos", JSON.stringify(localStorageToDo));
+  document.getElementById("todo-form").reset();
+  renderTasks(); // Re-render instead of reload
+});
+
+// Render all tasks
+function renderTasks() {
+  ["todo", "inprogress", "done"].forEach((columnId) => {
+    document.getElementById(columnId).innerHTML = ""; // Clear column
   });
 
-  //done tasks Data
-  const taskDoneData = todoTaskData.filter((item) => item.status === "done");
-  taskDoneData.forEach((item) => {
-    insertIntoColumn(item, "done", "success");
-  });
+  let todoTaskData = JSON.parse(localStorage.getItem("todos")) || [];
 
-  function insertIntoColumn(todo, columnId, color) {
-    let column = document.getElementById(columnId);
+  const statusMap = {
+    todo: { color: "warning" },
+    inprogress: { color: "info" },
+    done: { color: "success" },
+  };
 
-    let todoBox = document.createElement("div");
+  todoTaskData.forEach((item) => {
+    const status = item.status;
+    const column = document.getElementById(status);
+    const color = statusMap[status]?.color || "secondary";
+
+    const todoBox = document.createElement("div");
+    todoBox.classList.add("bg-" + color, "rounded-2", "p-2", "m-1", "draggable-task");
     todoBox.setAttribute("draggable", "true");
-    todoBox.classList.add(`bg-${color}`, "rounded-2", "p-1", "m-1");
+    todoBox.dataset.id = item.id; // Store ID
 
-    let title = document.createElement("h5");
-    title.textContent = `${todo.todo}`;
+    const title = document.createElement("h6");
+    title.classList.add("mb-1");
+    title.textContent = item.todo;
 
-    let editBtn = document.createElement("button");
-    editBtn.classList.add("btn", "btn-sm", "bg-warning");
+    const editBtn = document.createElement("button");
+    editBtn.classList.add("btn", "btn-sm", "btn-warning", "btn-sm");
     editBtn.textContent = "Edit";
 
+    // Append elements
     todoBox.appendChild(title);
     todoBox.appendChild(editBtn);
     column.appendChild(todoBox);
 
-    //   adding event to todoBox with dragabble to true
-    todoBox.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("text/plain", todo.id);
-    });
-  }
+    // Edit button click
+    editBtn.addEventListener("click", () => {
+      const newTitle = prompt("Edit task:", item.todo);
+      if (newTitle === null) return; // Cancelled
+      if (newTitle.trim() === "") {
+        alert("Task cannot be empty!");
+        return;
+      }
 
+      // Update in localStorage
+      const tasks = JSON.parse(localStorage.getItem("todos"));
+      const task = tasks.find(t => t.id === item.id);
+      if (task) {
+        task.todo = newTitle.trim();
+        localStorage.setItem("todos", JSON.stringify(tasks));
+        renderTasks(); // Refresh UI
+      }
+    });
+  });
+
+  setupDragAndDrop();
+}
+
+// Setup drag and drop
+function setupDragAndDrop() {
   ["todo", "inprogress", "done"].forEach((columnId) => {
     const column = document.getElementById(columnId);
 
@@ -83,13 +95,30 @@ document.addEventListener("DOMContentLoaded", function () {
     column.addEventListener("drop", (e) => {
       e.preventDefault();
       const taskId = parseInt(e.dataTransfer.getData("text/plain"));
-      const todoTaskData = JSON.parse(localStorage.getItem("todos")) || [];
-      const task = todoTaskData.find((t) => t.id === taskId);
+      const tasks = JSON.parse(localStorage.getItem("todos")) || [];
+      const task = tasks.find(t => t.id === taskId);
+
       if (task && task.status !== columnId) {
         task.status = columnId;
-        localStorage.setItem("todos", JSON.stringify(todoTaskData));
-        location.reload();
+        localStorage.setItem("todos", JSON.stringify(tasks));
+        renderTasks(); // Update UI without reload
       }
     });
   });
+
+  // Add dragstart to all draggable tasks
+  document.querySelectorAll(".draggable-task").forEach(task => {
+    task.addEventListener("dragstart", (e) => {
+      e.dataTransfer.setData("text/plain", task.dataset.id);
+    });
+  });
+}
+
+// Initial setup
+document.addEventListener("DOMContentLoaded", function () {
+  if (!localStorage.getItem("todos")) {
+    localStorage.setItem("todos", JSON.stringify([]));
+  }
+  renderTasks();
 });
+
