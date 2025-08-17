@@ -1,124 +1,152 @@
+let currentEditId = null; // Track the task being edited
 
-// Form Submit
+// Utility: get todos from storage
+function getTodos() {
+  return JSON.parse(localStorage.getItem("todos")) || [];
+}
+
+// Utility: save todos to storage
+function saveTodos(todos) {
+  localStorage.setItem("todos", JSON.stringify(todos));
+}
+
+// Utility: reset form
+function resetForm() {
+  document.getElementById("todo-form").reset();
+  document.getElementById("submitBtn").textContent = "Add";
+  document.getElementById("cancelBtn").classList.add("d-none"); // hide cancel
+  currentEditId = null;
+}
+
+// Handle form submit (Add / Update)
 document.getElementById("todo-form").addEventListener("submit", function (event) {
   event.preventDefault();
-  const enteredTodo = document.getElementById("enteredTodo").value.trim();
-
+  const inputEl = document.getElementById("enteredTodo");
+  const enteredTodo = inputEl.value.trim();
   if (!enteredTodo) return;
 
-  let localStorageToDo = JSON.parse(localStorage.getItem("todos")) || [];
+  let todos = getTodos();
 
-  const todoExist = localStorageToDo.find((todo) => todo.todo === enteredTodo);
-  if (todoExist) {
-    alert("ToDo already added");
-    document.getElementById("todo-form").reset();
+  if (currentEditId) {
+    // Update existing
+    const task = todos.find(t => t.id === currentEditId);
+    if (task) {
+      task.todo = enteredTodo;
+      saveTodos(todos);
+      renderTasks();
+    }
+    resetForm();
     return;
   }
 
-  localStorageToDo.push({
-    id: Date.now(), // Better unique ID than array index
+  // Prevent duplicates
+  if (todos.some(t => t.todo === enteredTodo)) {
+    alert("Task already exists!");
+    resetForm();
+    return;
+  }
+
+  // Add new task
+  todos.push({
+    id: Date.now(),
     todo: enteredTodo,
     status: "todo",
   });
-
-  localStorage.setItem("todos", JSON.stringify(localStorageToDo));
-  document.getElementById("todo-form").reset();
-  renderTasks(); // Re-render instead of reload
+  saveTodos(todos);
+  renderTasks();
+  resetForm();
 });
 
-// Render all tasks
+// Render tasks into columns
 function renderTasks() {
-  ["todo", "inprogress", "done"].forEach((columnId) => {
-    document.getElementById(columnId).innerHTML = ""; // Clear column
+  ["todo", "inprogress", "done"].forEach(id => {
+    document.getElementById(id).innerHTML = "";
   });
 
-  let todoTaskData = JSON.parse(localStorage.getItem("todos")) || [];
-
+  const todos = getTodos();
   const statusMap = {
-    todo: { color: "warning" },
-    inprogress: { color: "info" },
-    done: { color: "success" },
+    todo: "warning",
+    inprogress: "info",
+    done: "success",
   };
 
-  todoTaskData.forEach((item) => {
-    const status = item.status;
-    const column = document.getElementById(status);
-    const color = statusMap[status]?.color || "secondary";
+  todos.forEach(item => {
+    const column = document.getElementById(item.status);
 
     const todoBox = document.createElement("div");
-    todoBox.classList.add("bg-" + color, "rounded-2", "p-2", "m-1", "draggable-task");
+    todoBox.className = `bg-${statusMap[item.status]} rounded-2 p-2 m-1 draggable-task`;
     todoBox.setAttribute("draggable", "true");
-    todoBox.dataset.id = item.id; // Store ID
+    todoBox.dataset.id = item.id;
 
     const title = document.createElement("h6");
-    title.classList.add("mb-1");
+    title.className = "mb-1";
     title.textContent = item.todo;
 
     const editBtn = document.createElement("button");
-    editBtn.classList.add("btn", "btn-sm", "btn-warning", "btn-sm");
+    editBtn.className = "btn btn-sm btn-warning me-1";
     editBtn.textContent = "Edit";
 
-    // Append elements
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn btn-sm btn-danger";
+    deleteBtn.textContent = "Delete";
+
+    // Edit
+    editBtn.addEventListener("click", () => {
+      document.getElementById("enteredTodo").value = item.todo;
+      document.getElementById("submitBtn").textContent = "Update";
+      document.getElementById("cancelBtn").classList.remove("d-none"); // show cancel
+      currentEditId = item.id;
+    });
+
+    // Delete
+    deleteBtn.addEventListener("click", () => {
+      const updated = todos.filter(t => t.id !== item.id);
+      saveTodos(updated);
+      renderTasks();
+      if (currentEditId === item.id) resetForm();
+    });
+
     todoBox.appendChild(title);
     todoBox.appendChild(editBtn);
+    todoBox.appendChild(deleteBtn);
     column.appendChild(todoBox);
-
-    // Edit button click
-    editBtn.addEventListener("click", () => {
-      const newTitle = prompt("Edit task:", item.todo);
-      if (newTitle === null) return; // Cancelled
-      if (newTitle.trim() === "") {
-        alert("Task cannot be empty!");
-        return;
-      }
-
-      // Update in localStorage
-      const tasks = JSON.parse(localStorage.getItem("todos"));
-      const task = tasks.find(t => t.id === item.id);
-      if (task) {
-        task.todo = newTitle.trim();
-        localStorage.setItem("todos", JSON.stringify(tasks));
-        renderTasks(); // Refresh UI
-      }
-    });
   });
 
   setupDragAndDrop();
 }
 
-// Setup drag and drop
+// Cancel editing
+document.getElementById("cancelBtn").addEventListener("click", resetForm);
+
+// Drag & drop setup (same as your original)
 function setupDragAndDrop() {
-  ["todo", "inprogress", "done"].forEach((columnId) => {
+  ["todo", "inprogress", "done"].forEach(columnId => {
     const column = document.getElementById(columnId);
 
-    column.addEventListener("dragover", (e) => e.preventDefault());
-    column.addEventListener("drop", (e) => {
+    column.addEventListener("dragover", e => e.preventDefault());
+    column.addEventListener("drop", e => {
       e.preventDefault();
       const taskId = parseInt(e.dataTransfer.getData("text/plain"));
-      const tasks = JSON.parse(localStorage.getItem("todos")) || [];
-      const task = tasks.find(t => t.id === taskId);
+      const todos = getTodos();
+      const task = todos.find(t => t.id === taskId);
 
       if (task && task.status !== columnId) {
         task.status = columnId;
-        localStorage.setItem("todos", JSON.stringify(tasks));
-        renderTasks(); // Update UI without reload
+        saveTodos(todos);
+        renderTasks();
       }
     });
   });
 
-  // Add dragstart to all draggable tasks
   document.querySelectorAll(".draggable-task").forEach(task => {
-    task.addEventListener("dragstart", (e) => {
+    task.addEventListener("dragstart", e => {
       e.dataTransfer.setData("text/plain", task.dataset.id);
     });
   });
 }
 
-// Initial setup
-document.addEventListener("DOMContentLoaded", function () {
-  if (!localStorage.getItem("todos")) {
-    localStorage.setItem("todos", JSON.stringify([]));
-  }
+// Init
+document.addEventListener("DOMContentLoaded", () => {
+  if (!localStorage.getItem("todos")) saveTodos([]);
   renderTasks();
 });
-
