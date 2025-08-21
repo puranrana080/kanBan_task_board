@@ -47,9 +47,10 @@ document.getElementById("todo-form").addEventListener("submit", function (event)
   }
 
   // Add new task
+  const formattedTodo = enteredTodo.charAt(0).toUpperCase() + enteredTodo.slice(1);
   todos.push({
     id: Date.now(),
-    todo: enteredTodo,
+    todo: formattedTodo,
     status: "todo",
   });
   saveTodos(todos);
