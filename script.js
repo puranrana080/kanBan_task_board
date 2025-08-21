@@ -65,7 +65,7 @@ function renderTasks() {
 
   const todos = getTodos();
   const statusMap = {
-    todo: "warning",
+    todo: "secondary",
     inprogress: "info",
     done: "success",
   };
@@ -74,12 +74,12 @@ function renderTasks() {
     const column = document.getElementById(item.status);
 
     const todoBox = document.createElement("div");
-    todoBox.className = `bg-${statusMap[item.status]} rounded-2 p-2 m-1 draggable-task`;
+    todoBox.className = `bg-${statusMap[item.status]} rounded-2 p-2 m-1 draggable-task d-flex flex-nowrap align-items-center`;
     todoBox.setAttribute("draggable", "true");
     todoBox.dataset.id = item.id;
 
     const title = document.createElement("h6");
-    title.className = "mb-1";
+    title.className = "mb-1 me-3";
     title.textContent = item.todo;
 
     const editBtn = document.createElement("button");
